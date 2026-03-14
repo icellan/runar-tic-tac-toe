@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "runar-testing": ["../../runar/packages/runar-testing/dist/index.d.ts"],
+      "runar-testing/*": ["../../runar/packages/runar-testing/dist/*"],
+      "runar-lang": ["../../runar/packages/runar-lang/dist/index.d.ts"],
+      "runar-lang/*": ["../../runar/packages/runar-lang/dist/*"],
+      "runar-compiler": ["../../runar/packages/runar-compiler/dist/index.d.ts"],
+      "runar-compiler/*": ["../../runar/packages/runar-compiler/dist/*"],
+      "runar-ir-schema": ["../../runar/packages/runar-ir-schema/dist/index.d.ts"],
+      "runar-ir-schema/*": ["../../runar/packages/runar-ir-schema/dist/*"],
+      "@bsv/sdk": ["../../runar/node_modules/@bsv/sdk/dist/types/mod.d.ts"]
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "**/*.runar.ts",
+    "**/*.test.ts"
+  ]
+}

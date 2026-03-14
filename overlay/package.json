@@ -1,0 +1,31 @@
+{
+  "name": "tictactoe-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@bsv/overlay": "^2.0.2",
+    "@bsv/overlay-express": "^2.1.1",
+    "@bsv/sdk": "^1.4.18",
+    "better-sqlite3": "^11.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "knex": "^3.1.0",
+    "mongodb": "^6.8.0",
+    "runar-sdk": "file:../../runar/packages/runar-sdk"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  },
+  "overrides": {
+    "elliptic": "6.6.1",
+    "base-x": "3.0.11",
+    "bn.js": "4.12.3"
+  }
+}

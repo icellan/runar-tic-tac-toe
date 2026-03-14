@@ -1,0 +1,27 @@
+.idea
+node_modules/
+dist/
+
+# Compiled Go binary
+tic-tac-toe
+runar-tic-tac-toe
+frontend/runar-tic-toc
+
+# SQLite databases (legacy, no longer used)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Built frontend (embedded into Go binary)
+static/
+
+# Generated contract artifacts
+frontend/src/generated/
+
+# Runar compiler output
+RUNAR_*.md
+
+# Environment
+.env
+.env.local
