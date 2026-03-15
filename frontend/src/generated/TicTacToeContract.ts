@@ -3,9 +3,9 @@
 // Do not edit manually.
 
 import { RunarContract, buildP2PKHScript } from 'runar-sdk';
-import type { Provider, Signer, Transaction, DeployOptions, RunarArtifact, PreparedCall } from 'runar-sdk';
+import type { Provider, Signer, TransactionData, DeployOptions, RunarArtifact, PreparedCall } from 'runar-sdk';
 
-type CallResult = { txid: string; tx: any };
+type CallResult = { txid: string; tx: TransactionData };
 
 export interface TerminalOutput {
   satoshis: number;
@@ -36,6 +36,26 @@ export class TicTacToeContract {
     this.inner = new RunarContract(artifact, [args.playerX, args.betAmount]);
   }
 
+  static fromUtxo(
+    artifact: RunarArtifact,
+    utxo: { txid: string; outputIndex: number; satoshis: number; script: string },
+  ): TicTacToeContract {
+    const instance = Object.create(TicTacToeContract.prototype) as TicTacToeContract;
+    (instance as any).inner = RunarContract.fromUtxo(artifact, utxo);
+    return instance;
+  }
+
+  static async fromTxId(
+    artifact: RunarArtifact,
+    txid: string,
+    outputIndex: number,
+    provider: Provider,
+  ): Promise<TicTacToeContract> {
+    const instance = Object.create(TicTacToeContract.prototype) as TicTacToeContract;
+    (instance as any).inner = await RunarContract.fromTxId(artifact, txid, outputIndex, provider);
+    return instance;
+  }
+
   connect(provider: Provider, signer: Signer): void {
     this.inner.connect(provider, signer);
   }
@@ -44,6 +64,14 @@ export class TicTacToeContract {
   async deploy(provider: Provider, signer: Signer, options?: DeployOptions): Promise<CallResult>;
   async deploy(...args: unknown[]): Promise<CallResult> {
     return (this.inner.deploy as Function)(...args);
+  }
+
+  async deployWithWallet(options: { satoshis?: number; description?: string } = {}): Promise<{ txid: string; outputIndex: number }> {
+    return this.inner.deployWithWallet(options);
+  }
+
+  getLockingScript(): string {
+    return this.inner.getLockingScript();
   }
 
   get contract(): RunarContract {

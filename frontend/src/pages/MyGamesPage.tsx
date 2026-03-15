@@ -1,17 +1,12 @@
-import { useState, useEffect } from 'react'
 import { useWallet } from '../hooks/useWallet'
-import { useMyGameList } from '../hooks/useGameList'
+import { useDerivedKey } from '../hooks/useDerivedKey'
+import { useGameList } from '../hooks/useGameList'
 import GameList from '../components/GameList'
-import { getDerivedPubKey } from '../lib/wallet'
 
 export default function MyGamesPage() {
   const { connected, pubkey } = useWallet()
-  const [derivedKey, setDerivedKey] = useState('')
-  useEffect(() => {
-    if (connected) getDerivedPubKey().then(setDerivedKey).catch(() => {})
-  }, [connected])
-  // Query with derived key (new games) — backend also checks identity key for legacy
-  const { games, loading } = useMyGameList(derivedKey || pubkey)
+  const { derivedKey } = useDerivedKey()
+  const { games, loading } = useGameList(derivedKey || pubkey)
 
   if (!connected) {
     return (

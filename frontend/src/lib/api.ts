@@ -1,7 +1,7 @@
 import type { Game, BroadcastResponse } from './types'
+import { OVERLAY_URL } from './wallet-provider'
 
 const BASE = '/api'
-const OVERLAY_URL = 'http://localhost:8081'
 
 async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
@@ -58,14 +58,4 @@ export async function registerIdentityKey(txid: string, derivedPubkey: string, i
   if (!resp.ok) {
     console.warn('[registerIdentityKey] failed:', resp.status)
   }
-}
-
-/** Get opponent's identity key from the overlay game data */
-export async function getOpponentIdentityKey(gameId: string, myDerivedPubkey: string): Promise<string | null> {
-  const game = await getGame(gameId)
-  if (!game) return null
-  // Determine which player I am and return the opponent's identity key
-  const isPlayerX = game.playerX === myDerivedPubkey
-  const key = isPlayerX ? (game as any).identityKeyO : (game as any).identityKeyX
-  return key || null
 }

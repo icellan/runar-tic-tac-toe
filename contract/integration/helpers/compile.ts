@@ -12,7 +12,7 @@ export function compileContract(): RunarArtifact {
   const source = readFileSync(absPath, 'utf-8');
   const result = compile(source, { fileName: 'TicTacToe.runar.ts' });
   if (!result.artifact) {
-    throw new Error(`Compile failed: ${JSON.stringify(result.errors)}`);
+    throw new Error(`Compile failed: ${JSON.stringify(result.diagnostics)}`);
   }
   return result.artifact;
 }

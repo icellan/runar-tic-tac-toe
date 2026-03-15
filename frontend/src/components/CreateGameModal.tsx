@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
+import { useDerivedKey } from '../hooks/useDerivedKey'
 import { useNavigate } from 'react-router-dom'
 import { recordAction, registerIdentityKey } from '../lib/api'
-import { walletCreateAction, getDerivedPubKey, getWalletIdentityKey } from '../lib/wallet'
+import { signer } from '../lib/wallet'
 import { TicTacToeContract } from '../generated/TicTacToeContract'
-import { artifact, estimateTxFee } from '../lib/game-contract'
+import { artifact, provider, estimateFee } from '../lib/wallet-provider'
 
 interface CreateGameModalProps {
   open: boolean
@@ -12,7 +13,8 @@ interface CreateGameModalProps {
 }
 
 export default function CreateGameModal({ open, onClose }: CreateGameModalProps) {
-  const { connected, pubkey } = useWallet()
+  const { connected } = useWallet()
+  const { derivedKey, identityKey } = useDerivedKey()
   const navigate = useNavigate()
   const [betAmount, setBetAmount] = useState(1000)
   const [isPublic, setIsPublic] = useState(true)
@@ -27,7 +29,7 @@ export default function CreateGameModal({ open, onClose }: CreateGameModalProps)
   }
 
   async function handleCreate() {
-    if (!connected) {
+    if (!connected || !derivedKey) {
       setError('Connect your wallet first')
       return
     }
@@ -36,43 +38,31 @@ export default function CreateGameModal({ open, onClose }: CreateGameModalProps)
     setError('')
 
     try {
-      // 1. Get derived pubkey for contract interactions
-      const derivedPK = await getDerivedPubKey()
-
-      // 2. Generate locking script locally using the typed contract
       const contract = new TicTacToeContract(artifact, {
-        playerX: derivedPK,
+        playerX: derivedKey,
         betAmount: BigInt(betAmount),
       })
-      const lockingScript = contract.contract.getLockingScript()
+      contract.connect(provider, signer)
 
-      // 3. Ask wallet to create and fund the transaction
-      // Overfund by the estimated terminal tx fee so cancel/win payouts have enough for mining.
-      const txFeeMargin = estimateTxFee()
-      const walletResult = await walletCreateAction({
-        outputs: [{ lockingScript, satoshis: betAmount + txFeeMargin, outputDescription: 'TicTacToe contract UTXO' }],
+      // Overfund by the estimated terminal tx fee so cancel/win payouts
+      // have enough for mining.
+      const txFeeMargin = estimateFee()
+      const { txid, outputIndex } = await contract.deployWithWallet({
+        satoshis: betAmount + txFeeMargin,
         description: `Create Tic-Tac-Toe game (${betAmount} sats bet)`,
       })
 
-      // 4. Record in backend (wallet already broadcast via ARC)
-      const broadcastResult = await recordAction(
-        walletResult.txid || 'pending',
-        walletResult.txid || 'pending',
-        'create',
-        {
-          playerPubKey: derivedPK,
-          betAmount,
-          contractSatoshis: walletResult.satoshis,
-          isPublic,
-          lockingScript,
-          vout: walletResult.vout,
-        }
-      )
+      const broadcastResult = await recordAction(txid, txid, 'create', {
+        playerPubKey: derivedKey,
+        betAmount,
+        contractSatoshis: betAmount + txFeeMargin,
+        isPublic,
+        lockingScript: contract.getLockingScript(),
+        vout: outputIndex,
+      })
 
-      // Register identity key with overlay for MessageBox cancel flow
-      const idKey = await getWalletIdentityKey()
-      if (idKey) {
-        registerIdentityKey(walletResult.txid, derivedPK, idKey).catch(console.error)
+      if (identityKey) {
+        registerIdentityKey(txid, derivedKey, identityKey).catch(console.error)
       }
 
       onClose()

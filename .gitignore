@@ -21,6 +21,7 @@ frontend/src/generated/
 
 # Runar compiler output
 RUNAR_*.md
+contract/*.runar.json
 
 # Environment
 .env

@@ -6,14 +6,20 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "compile": "runar compile TicTacToe.runar.ts -o .",
+    "debug": "runar debug TicTacToe.runar.json",
+    "debug:move": "runar debug TicTacToe.runar.json --method move --args '{\"position\": 4, \"player\": \"03a34b99f22c790c4e36b2b3c2c35a36db06226e41c692fc82b8b56ac1c540c5bd\", \"sig\": \"\"}'",
+    "debug:join": "runar debug TicTacToe.runar.json --method join --args '{\"opponentPK\": \"03d6bfe100d1600c0d8f769501676fc74c3809500bd131c8a549f88cf616c21f35\", \"sig\": \"\"}'"
   },
   "devDependencies": {
     "@bsv/sdk": "^2.0.5",
     "@types/node": "^25.3.5",
+    "runar-cli": "file:../../runar/packages/runar-cli",
     "runar-compiler": "file:../../runar/packages/runar-compiler",
     "runar-ir-schema": "file:../../runar/packages/runar-ir-schema",
     "runar-lang": "file:../../runar/packages/runar-lang",
+    "runar-sdk": "file:../../runar/packages/runar-sdk",
     "runar-testing": "file:../../runar/packages/runar-testing",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
