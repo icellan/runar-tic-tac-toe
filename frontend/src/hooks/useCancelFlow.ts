@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Game } from '../lib/types'
 import { signer } from '../lib/wallet'
-import { provider, artifact, estimateFee } from '../lib/wallet-provider'
-import { recordAction, prepareSpend } from '../lib/api'
+import { provider, artifact, estimateFee, pubkeyToPKH } from '../lib/wallet-provider'
+import { broadcastGameState } from '../lib/api'
 import { TicTacToeContract } from '../generated/TicTacToeContract'
 
 const CANCEL_MESSAGE_BOX = 'tic-tac-toe-cancel'
@@ -15,16 +15,16 @@ interface CancelMessage {
   preparedCall?: string
 }
 
-async function loadContract(gameId: string) {
-  const prep = await prepareSpend(gameId)
+/** Load the on-chain contract from local game state. */
+function loadContract(game: Game) {
   const contract = TicTacToeContract.fromUtxo(artifact, {
-    txid: prep.contractTxid,
-    outputIndex: prep.contractVout,
-    satoshis: prep.contractSatoshis,
-    script: prep.lockingScript,
+    txid: game.txid,
+    outputIndex: game.outputIndex,
+    satoshis: game.satoshis,
+    script: game.lockingScript,
   })
   contract.connect(provider, signer)
-  return { contract, prep }
+  return contract
 }
 
 export function useCancelFlow(
@@ -34,6 +34,7 @@ export function useCancelFlow(
   isPlayerX: boolean,
   isPlayerO: boolean,
   setGame: (g: Game) => void,
+  roomId: string | undefined,
 ) {
   const [cancelProposal, setCancelProposal] = useState<CancelMessage | null>(null)
   const [cancelProposed, setCancelProposed] = useState(false)
@@ -44,7 +45,7 @@ export function useCancelFlow(
 
   // Initialize MessageBox client and poll for cancel messages
   useEffect(() => {
-    if (!game || game.status !== 1 || !identityKey) return
+    if (!game || game.status !== 1 || !identityKey || !roomId) return
     const isPlayer = game.playerX === derivedKey || game.playerO === derivedKey
     if (!isPlayer) return
 
@@ -65,7 +66,7 @@ export function useCancelFlow(
             for (const msg of messages || []) {
               try {
                 const parsed: CancelMessage = JSON.parse(msg.body)
-                if (game && parsed.gameId === game.gameId) {
+                if (parsed.gameId === roomId) {
                   if (parsed.type === 'propose' || (parsed.type === 'approve' && parsed.signature && parsed.preparedCall)) {
                     setCancelProposal(parsed)
                   }
@@ -92,30 +93,37 @@ export function useCancelFlow(
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
       messageBoxRef.current = null
     }
-  }, [game?.gameId, game?.status, identityKey, derivedKey])
+  }, [roomId, game?.status, identityKey, derivedKey])
 
   const handleCancel = useCallback(async () => {
-    if (!game || !derivedKey) return
+    if (!game || !derivedKey || !roomId) return
     setLoading(true)
     setError('')
     try {
-      const { contract, prep } = await loadContract(game.gameId)
-      const noChangePKH = '00'.repeat(20)
-      const { txid } = await contract.cancelBeforeJoin(noChangePKH, 0n, [
-        { address: prep.playerX, satoshis: prep.betAmount },
+      const fee = estimateFee()
+      await provider.ensureFunding(fee)
+      const contract = loadContract(game)
+      const changePKH = pubkeyToPKH(derivedKey)
+      // The contract UTXO was funded with betAmount + feeMargin at deploy;
+      // payout is betAmount, so the surplus goes back as change.
+      const changeAmount = game.satoshis - game.betAmount
+      const { txid } = await contract.cancelBeforeJoin(changePKH, BigInt(Math.max(0, changeAmount)), [
+        { address: game.playerX, satoshis: game.betAmount },
       ])
-      await recordAction(game.gameId, txid, 'cancelBeforeJoin', {})
-      setGame({ ...game, status: 5 })
+
+      const newGame: Game = { ...game, txid, status: 5, satoshis: 0, updatedAt: new Date().toISOString() }
+      await broadcastGameState(roomId, newGame)
+      setGame(newGame)
     } catch (err: any) {
       console.error('[cancel]', err)
       setError('Failed to cancel game')
     } finally {
       setLoading(false)
     }
-  }, [game, derivedKey, setGame])
+  }, [game, derivedKey, roomId, setGame])
 
   const handleProposeCancel = useCallback(async () => {
-    if (!game || !derivedKey || !messageBoxRef.current) return
+    if (!game || !derivedKey || !messageBoxRef.current || !roomId) return
     setLoading(true)
     setError('')
     try {
@@ -127,7 +135,7 @@ export function useCancelFlow(
       await messageBoxRef.current.sendMessage({
         recipient: opponentIdentityKey,
         messageBox: CANCEL_MESSAGE_BOX,
-        body: JSON.stringify({ type: 'propose', gameId: game.gameId }),
+        body: JSON.stringify({ type: 'propose', gameId: roomId }),
       })
       setCancelProposed(true)
     } catch (err: any) {
@@ -136,18 +144,21 @@ export function useCancelFlow(
     } finally {
       setLoading(false)
     }
-  }, [game, derivedKey, isPlayerX])
+  }, [game, derivedKey, isPlayerX, roomId])
 
   const handleApproveCancel = useCallback(async () => {
-    if (!game || !derivedKey || !messageBoxRef.current) return
+    if (!game || !derivedKey || !messageBoxRef.current || !roomId) return
     setLoading(true)
     setError('')
     try {
-      const { contract, prep } = await loadContract(game.gameId)
-      const noChangePKH = '00'.repeat(20)
-      const prepared = await contract.prepareCancel(noChangePKH, 0n, [
-        { address: prep.playerX, satoshis: prep.betAmount },
-        { address: prep.playerO, satoshis: prep.betAmount },
+      const fee = estimateFee()
+      const contract = loadContract(game)
+      // Change goes to the opponent (proposer) who will finalize and fund the tx
+      const opponentKey = isPlayerX ? game.playerO : game.playerX
+      const changePKH = pubkeyToPKH(opponentKey)
+      const prepared = await contract.prepareCancel(changePKH, BigInt(fee), [
+        { address: game.playerX, satoshis: game.betAmount },
+        { address: game.playerO, satoshis: game.betAmount },
       ])
       const mySigHex = await signer.signHash(prepared.sighash)
       const opponentIdentityKey = isPlayerX ? game.identityKeyO : game.identityKeyX
@@ -157,7 +168,7 @@ export function useCancelFlow(
       }
       const msg: CancelMessage = {
         type: 'approve',
-        gameId: game.gameId,
+        gameId: roomId,
         sighash: prepared.sighash,
         signature: mySigHex,
         preparedCall: JSON.stringify(prepared),
@@ -174,29 +185,34 @@ export function useCancelFlow(
     } finally {
       setLoading(false)
     }
-  }, [game, derivedKey, isPlayerX])
+  }, [game, derivedKey, isPlayerX, roomId])
 
   const handleSignCancel = useCallback(async () => {
-    if (!game || !derivedKey || !cancelProposal?.sighash || !cancelProposal?.preparedCall) return
+    if (!game || !derivedKey || !cancelProposal?.sighash || !cancelProposal?.preparedCall || !roomId) return
     setLoading(true)
     setError('')
     try {
+      // Fund fee + the change amount the approver baked into prepareCancel
+      const fee = estimateFee()
+      await provider.ensureFunding(fee * 2)
       const mySigHex = await signer.signHash(cancelProposal.sighash)
       const prepared = JSON.parse(cancelProposal.preparedCall)
       const approverSig = cancelProposal.signature!
       const sigX = isPlayerX ? mySigHex : approverSig
       const sigO = isPlayerX ? approverSig : mySigHex
-      const { contract } = await loadContract(game.gameId)
+      const contract = loadContract(game)
       const { txid } = await contract.finalizeCancel(prepared, sigX, sigO)
-      await recordAction(game.gameId, txid, 'cancel', {})
-      setGame({ ...game, status: 5 })
+
+      const newGame: Game = { ...game, txid, status: 5, satoshis: 0, updatedAt: new Date().toISOString() }
+      await broadcastGameState(roomId, newGame)
+      setGame(newGame)
     } catch (err: any) {
       console.error('[sign-cancel]', err)
       setError('Failed to sign cancellation')
     } finally {
       setLoading(false)
     }
-  }, [game, derivedKey, cancelProposal, isPlayerX, setGame])
+  }, [game, derivedKey, cancelProposal, isPlayerX, roomId, setGame])
 
   return {
     cancelProposal,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Game } from '../lib/types'
 import { getGame } from '../lib/api'
+import { OVERLAY_URL } from '../lib/wallet-provider'
 
 export function useGame(gameId: string | undefined) {
   const [game, setGame] = useState<Game | null>(null)
@@ -31,8 +32,8 @@ export function useGame(gameId: string | undefined) {
 
     load()
 
-    // Subscribe to SSE for live updates
-    const es = new EventSource(`/api/games/${gameId}/events`)
+    // Subscribe to SSE for live updates (now via overlay directly)
+    const es = new EventSource(`${OVERLAY_URL}/api/games/${gameId}/events`)
     eventSourceRef.current = es
 
     es.onmessage = (event) => {
@@ -40,6 +41,7 @@ export function useGame(gameId: string | undefined) {
         const data = JSON.parse(event.data)
         if (!cancelled) {
           setGame(data)
+          setLoading(false)
         }
       } catch {
         // ignore parse errors

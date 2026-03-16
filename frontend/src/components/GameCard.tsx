@@ -54,7 +54,7 @@ function statusBadgeClass(status: number): string {
 
 export default function GameCard({ game }: GameCardProps) {
   return (
-    <Link to={`/game/${game.gameId}`} style={{ textDecoration: 'none' }}>
+    <Link to={`/game/${game.txid}`} style={{ textDecoration: 'none' }}>
       <div className="card" style={{
         display: 'flex',
         alignItems: 'center',
@@ -76,7 +76,7 @@ export default function GameCard({ game }: GameCardProps) {
             </span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>
-            {game.gameId.slice(0, 12)}...
+            {game.txid.slice(0, 12)}...
             {game.createdAt && (
               <span style={{ marginLeft: 8 }}>{timeAgo(game.createdAt)}</span>
             )}

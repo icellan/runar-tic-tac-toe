@@ -6,6 +6,7 @@
  */
 import { WalletProvider, estimateCallFee } from 'runar-sdk'
 import type { RunarArtifact } from 'runar-sdk'
+import { Hash } from '@bsv/sdk'
 import { wallet, signer } from './wallet'
 import artifactJSON from '../generated/TicTacToe.runar.json'
 
@@ -26,4 +27,9 @@ export const provider = new WalletProvider({
 
 export function estimateFee(): number {
   return estimateCallFee(artifact.script.length / 2, artifact.script.length / 4, 1, 0.1)
+}
+
+/** Compute the hash160 PKH for a compressed public key hex string. */
+export function pubkeyToPKH(pubkey: string): string {
+  return Hash.hash160(pubkey, 'hex').map((b: number) => b.toString(16).padStart(2, '0')).join('')
 }

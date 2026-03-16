@@ -6,6 +6,7 @@ import { MongoClient } from 'mongodb'
 import { TicTacToeTopicManager } from './TicTacToeTopicManager.js'
 import { TicTacToeLookupService } from './TicTacToeLookupService.js'
 import { TicTacToeStorage } from './TicTacToeStorage.js'
+import { SSEHub } from './SSEHub.js'
 
 const PRIVATE_KEY = process.env.OVERLAY_PRIVATE_KEY || process.env.SERVER_PRIVATE_KEY
 const HOSTING_URL = process.env.OVERLAY_HOSTING_URL || 'http://localhost:8081'
@@ -142,6 +143,47 @@ async function main() {
       } catch {
         res.status(500).json({ games: 0 })
       }
+    })
+
+    // SSE hub for real-time game updates
+    const sseHub = new SSEHub()
+
+    // SSE endpoint — subscribe to live game updates
+    app.get('/api/games/:roomId/events', async (req: any, res: any) => {
+      const { roomId } = req.params
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+      })
+
+      // Send initial state: cached last broadcast or fetch from DB
+      const cached = sseHub.getLastState(roomId)
+      if (cached) {
+        res.write(`data: ${JSON.stringify(cached)}\n\n`)
+      } else {
+        try {
+          const game = await storage.findByTxid(roomId)
+          if (game) {
+            res.write(`data: ${JSON.stringify(game)}\n\n`)
+          }
+        } catch { /* ignore */ }
+      }
+
+      sseHub.subscribe(roomId, res)
+      req.on('close', () => sseHub.unsubscribe(roomId, res))
+    })
+
+    // Broadcast endpoint — relay game state to SSE subscribers
+    app.post('/api/games/:roomId/broadcast', async (req: any, res: any) => {
+      const { roomId } = req.params
+      const game = req.body
+      if (!game || !game.txid) {
+        return res.status(400).json({ error: 'missing game state with txid' })
+      }
+      sseHub.broadcast(roomId, game)
+      res.json({ txid: game.txid, roomId, game })
     })
 
     // Register a player's identity key for MessageBox cancel flow

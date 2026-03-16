@@ -8,24 +8,24 @@ import GameBoard from '../components/GameBoard'
 import PlayerBadge from '../components/PlayerBadge'
 import BetDisplay from '../components/BetDisplay'
 import MoveLog from '../components/MoveLog'
-import { recordAction, registerIdentityKey, prepareSpend } from '../lib/api'
+import { broadcastGameState, registerIdentityKey } from '../lib/api'
 import { signer } from '../lib/wallet'
-import { provider, artifact, estimateFee } from '../lib/wallet-provider'
+import { provider, artifact, estimateFee, pubkeyToPKH } from '../lib/wallet-provider'
 import { TicTacToeContract } from '../generated/TicTacToeContract'
 import { analyzeMove } from '../lib/game-logic'
 import { STATUS_LABELS } from '../lib/types'
+import type { Game } from '../lib/types'
 
-/** Load the on-chain contract for a game, ready for method calls. */
-async function loadGameContract(gameId: string) {
-  const prep = await prepareSpend(gameId)
+/** Load the on-chain contract from local game state (no network call needed). */
+function loadGameContract(game: Game) {
   const contract = TicTacToeContract.fromUtxo(artifact, {
-    txid: prep.contractTxid,
-    outputIndex: prep.contractVout,
-    satoshis: prep.contractSatoshis,
-    script: prep.lockingScript,
+    txid: game.txid,
+    outputIndex: game.outputIndex,
+    satoshis: game.satoshis,
+    script: game.lockingScript,
   })
   contract.connect(provider, signer)
-  return { contract, prep }
+  return contract
 }
 
 export default function GamePage() {
@@ -43,15 +43,15 @@ export default function GamePage() {
     (game.turn === 1 && isPlayerX) || (game.turn === 2 && isPlayerO)
   )
 
-  const cancel = useCancelFlow(game, derivedKey, identityKey, isPlayerX, isPlayerO, setGame)
+  const cancel = useCancelFlow(game, derivedKey, identityKey, isPlayerX, isPlayerO, setGame, id)
 
   // Register identity key with overlay when we know both game and identity
   useEffect(() => {
     if (!game || !derivedKey || !identityKey) return
     const isPlayer = game.playerX === derivedKey || game.playerO === derivedKey
     if (!isPlayer) return
-    registerIdentityKey(game.currentTxid, derivedKey, identityKey).catch(console.error)
-  }, [game?.currentTxid, derivedKey, identityKey])
+    registerIdentityKey(game.txid, derivedKey, identityKey).catch(console.error)
+  }, [game?.txid, derivedKey, identityKey])
 
   const handleCellClick = useCallback(async (index: number) => {
     if (!game || !isMyTurn || actionLoading || !derivedKey) return
@@ -66,44 +66,66 @@ export default function GamePage() {
       }
 
       const moveResult = analyzeMove(game.board, index, game.turn, game.playerX, game.playerO)
-      const contractSatoshis = game.betAmount * 2
 
-      if (moveResult.method === 'move') {
-        await provider.ensureFunding(estimateFee())
-      }
+      const fee = estimateFee()
+      const changePKH = pubkeyToPKH(derivedKey)
 
-      const { contract, prep } = await loadGameContract(game.gameId)
+      const contract = loadGameContract(game)
       let txid: string
-      const noChangePKH = '00'.repeat(20)
+      let newSatoshis = game.satoshis
 
       if (moveResult.method === 'moveAndWin') {
-        const result = await contract.moveAndWin(BigInt(index), null, noChangePKH, 0n, [
-          { address: moveResult.winnerPubkey!, satoshis: contractSatoshis },
+        // Fund fee + change buffer; the contract returns the buffer to our wallet
+        await provider.ensureFunding(fee * 2)
+        const result = await contract.moveAndWin(BigInt(index), null, changePKH, BigInt(fee), [
+          { address: moveResult.winnerPubkey!, satoshis: game.betAmount * 2 },
         ])
         txid = result.txid
+        newSatoshis = 0
       } else if (moveResult.method === 'moveAndTie') {
-        const result = await contract.moveAndTie(BigInt(index), null, noChangePKH, 0n, [
+        await provider.ensureFunding(fee * 2)
+        const result = await contract.moveAndTie(BigInt(index), null, changePKH, BigInt(fee), [
           { address: moveResult.playerX!, satoshis: game.betAmount },
           { address: moveResult.playerO!, satoshis: game.betAmount },
         ])
         txid = result.txid
+        newSatoshis = 0
       } else {
         const result = await contract.move(BigInt(index), null, {
-          satoshis: prep.contractSatoshis,
+          satoshis: game.satoshis,
         })
         txid = result.txid
       }
 
-      const broadcastResult = await recordAction(game.gameId, txid, moveResult.method, { position: index })
+      // Build the new game state
+      const newBoard = game.board.split('')
+      newBoard[index] = String(game.turn)
+      const newStatus = moveResult.method === 'moveAndWin'
+        ? (game.turn === 1 ? 2 : 3)
+        : moveResult.method === 'moveAndTie' ? 4 : 1
+      const newGame: Game = {
+        ...game,
+        txid,
+        outputIndex: 0,
+        board: newBoard.join(''),
+        turn: game.turn === 1 ? 2 : 1,
+        status: newStatus,
+        satoshis: newSatoshis,
+        updatedAt: new Date().toISOString(),
+      }
+
       if (moveResult.winLine) setWinLine(moveResult.winLine)
-      setGame(broadcastResult.game)
+
+      // Broadcast to SSE subscribers and update local state
+      await broadcastGameState(id!, newGame)
+      setGame(newGame)
     } catch (err: any) {
       console.error('[move]', err)
       setActionError('Failed to make move')
     } finally {
       setActionLoading(false)
     }
-  }, [game, isMyTurn, actionLoading, derivedKey, setGame])
+  }, [game, isMyTurn, actionLoading, derivedKey, setGame, id])
 
   const handleJoin = useCallback(async () => {
     if (!game || !connected || !derivedKey || isPlayerX) return
@@ -113,10 +135,22 @@ export default function GamePage() {
 
     try {
       await provider.ensureFunding(game.betAmount + estimateFee())
-      const { contract } = await loadGameContract(game.gameId)
+      const contract = loadGameContract(game)
       const result = await contract.join(null, { satoshis: game.betAmount * 2 })
-      const broadcastResult = await recordAction(game.gameId, result.txid, 'join', { opponentPubKey: derivedKey })
-      setGame(broadcastResult.game)
+
+      const newGame: Game = {
+        ...game,
+        txid: result.txid,
+        outputIndex: 0,
+        playerO: derivedKey,
+        status: 1,
+        satoshis: game.betAmount * 2,
+        updatedAt: new Date().toISOString(),
+      }
+
+      await broadcastGameState(id!, newGame)
+      setGame(newGame)
+
       if (identityKey) {
         registerIdentityKey(result.txid, derivedKey, identityKey).catch(console.error)
       }
@@ -126,7 +160,7 @@ export default function GamePage() {
     } finally {
       setActionLoading(false)
     }
-  }, [game, connected, derivedKey, isPlayerX, identityKey, setGame])
+  }, [game, connected, derivedKey, isPlayerX, identityKey, setGame, id])
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-dim)' }}>Loading game...</div>
@@ -244,9 +278,9 @@ export default function GamePage() {
       </div>
 
       <div style={{ marginTop: 16, fontSize: 11, color: 'var(--color-text-dim)', textAlign: 'center', wordBreak: 'break-all' }}>
-        Game: {game.gameId}
+        Game: {id}
         <br />
-        Current TX: {game.currentTxid}
+        Current TX: {game.txid}
       </div>
     </div>
   )

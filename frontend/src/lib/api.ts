@@ -1,10 +1,8 @@
 import type { Game, BroadcastResponse } from './types'
 import { OVERLAY_URL } from './wallet-provider'
 
-const BASE = '/api'
-
 async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(BASE + url, {
+  const res = await fetch(OVERLAY_URL + url, {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...opts?.headers },
   })
@@ -16,36 +14,23 @@ async function fetchJSON<T>(url: string, opts?: RequestInit): Promise<T> {
 }
 
 export async function listGames(): Promise<Game[]> {
-  return fetchJSON('/games')
+  return fetchJSON('/api/games')
 }
 
 export async function listMyGames(pubkey: string): Promise<Game[]> {
-  return fetchJSON(`/games/mine?pubkey=${encodeURIComponent(pubkey)}`)
+  return fetchJSON(`/api/games/by-player/${encodeURIComponent(pubkey)}`)
 }
 
 export async function getGame(id: string): Promise<Game> {
-  return fetchJSON(`/games/${id}`)
+  return fetchJSON(`/api/games/${id}`)
 }
 
-/** Record a completed action (after wallet broadcasts) and relay via SSE */
-export async function recordAction(id: string, txid: string, action: string, extra?: Record<string, unknown>): Promise<BroadcastResponse> {
-  return fetchJSON(`/games/${id}/broadcast`, {
+/** Broadcast game state to SSE subscribers via the overlay */
+export async function broadcastGameState(roomId: string, game: Game): Promise<BroadcastResponse> {
+  return fetchJSON(`/api/games/${roomId}/broadcast`, {
     method: 'POST',
-    body: JSON.stringify({ txid, action, ...extra }),
+    body: JSON.stringify(game),
   })
-}
-
-/** Get contract UTXO info for building spending transactions */
-export async function prepareSpend(id: string): Promise<{
-  contractTxid: string
-  contractVout: number
-  contractSatoshis: number
-  lockingScript: string
-  betAmount: number
-  playerX: string
-  playerO: string
-}> {
-  return fetchJSON(`/games/${id}/prepare`)
 }
 
 /** Register identity key with the overlay for MessageBox cancel flow */

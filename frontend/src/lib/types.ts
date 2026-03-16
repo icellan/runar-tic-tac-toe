@@ -1,13 +1,14 @@
 export interface Game {
-  gameId: string
-  currentTxid: string
-  currentVout: number
+  txid: string
+  outputIndex: number
   playerX: string
   playerO: string
   board: string
   turn: number
   status: number // 0=waiting, 1=playing, 2=x_wins, 3=o_wins, 4=tie, 5=cancelled
   betAmount: number
+  satoshis: number
+  lockingScript: string
   identityKeyX?: string
   identityKeyO?: string
   createdAt: string
@@ -16,7 +17,7 @@ export interface Game {
 
 export interface BroadcastResponse {
   txid: string
-  gameId?: string
+  roomId: string
   game: Game
 }
 

@@ -6,22 +6,20 @@ A multiplayer Tic-Tac-Toe game where every move is an on-chain Bitcoin SV transa
 ┌─────────────────────────────────────────────────────────────────┐
 │                          Architecture                           │
 │                                                                 │
-│  ┌─────────┐   HTTP/SSE   ┌──────────┐   REST   ┌───────────┐   │
-│  │ Browser │◄────────────►│ Go       │◄────────►│ Overlay   │   │
-│  │ (React) │              │ Backend  │          │ Service   │   │
-│  └────┬────┘              └──────────┘          └─────┬─────┘   │
-│       │                                               │         │
-│       │  BRC-100 wallet                          MongoDB        │
-│       │  + ARC broadcast                              │         │
-│       ▼                                               ▼         │
-│  ┌─────────┐                                   ┌───────────┐    │
-│  │   BSV   │──── new blocks/txs ──────────────►│  Overlay  │    │
-│  │ Network │                                   │  Engine   │    │
-│  └─────────┘                                   └───────────┘    │
+│  ┌─────────┐  REST/SSE   ┌───────────┐                          │
+│  │ Browser │◄───────────►│ Overlay   │                          │
+│  │ (React) │             │ Service   │                          │
+│  └────┬────┘             └─────┬─────┘                          │
+│       │                        │                                │
+│       │  BRC-100 wallet   MongoDB                               │
+│       │                        │                                │
+│       ├── ARC broadcast ──►  BSV Network  (mining)              │
+│       └── /submit ────────►  Overlay Engine (indexing)          │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**The smart contract is the single source of truth.** The frontend handles all contract interactions directly via `runar-sdk`. The overlay service watches the blockchain, identifies TicTacToe transactions, and indexes game state in MongoDB. The Go backend is a thin relay: it queries the overlay for game state and pushes real-time updates to browsers via SSE.
+**The smart contract is the single source of truth.** The frontend handles all contract interactions directly via `runar-sdk`. When a transaction is broadcast, the SDK submits it to both ARC (for mining) and the overlay's `/submit` endpoint (for indexing). The overlay identifies TicTacToe outputs, deserializes contract state into MongoDB, and serves a REST API plus SSE for real-time updates. The frontend is a static site (deployable to Cloudflare Pages) that talks directly to the overlay.
 
 ---
 
@@ -31,19 +29,32 @@ The overlay service is the bridge between the blockchain and the application. It
 
 ### Data Flow
 
-1. **Player makes a move** — the frontend builds a transaction via `runar-sdk`, the BRC-100 wallet signs it, and it's broadcast to the BSV network via ARC. The SDK also submits the transaction to the overlay for indexing.
+There are two parallel paths: **indexing** (for persistent game state) and **real-time SSE** (for instant opponent updates).
+
+#### Indexing path
+
+1. **Player makes a move** — the frontend builds a transaction via `runar-sdk`, the BRC-100 wallet signs it, and it's broadcast to ARC (for mining). The SDK simultaneously submits the transaction to the overlay's `/submit` endpoint for indexing.
 
 2. **Overlay receives the transaction** — the `TicTacToeTopicManager` inspects each output. It uses `matchesArtifact()` from `runar-sdk` to check if the output's locking script matches the compiled TicTacToe contract.
 
 3. **Overlay indexes the game state** — the `TicTacToeLookupService` deserializes the contract state (board, turn, status, players) from the OP_RETURN data using `deserializeState()`, and extracts constructor args (playerX, betAmount) using `extractConstructorArgs()`. This is stored in MongoDB.
 
-4. **Go backend queries the overlay** — when browsers request game lists or game state, the Go backend fetches from the overlay's REST API and relays via SSE for real-time updates.
+4. **Frontend queries the overlay** — browsers call the overlay's REST API for game lists and game state.
+
+#### Real-time SSE path
+
+1. **Both players subscribe to SSE** — when a player opens a game page, the frontend connects to `GET /api/games/:roomId/events` (where `roomId` is the game's creation txid). The overlay sends the latest cached state on connect.
+
+2. **Player makes a move and broadcasts state** — after a successful contract call, the frontend constructs the new game state locally and POSTs it to `POST /api/games/:roomId/broadcast`.
+
+3. **Overlay pushes to opponent** — the SSE hub relays the game state to all connected clients in that room. The opponent sees the move instantly, without waiting for the indexing path to complete.
 
 ### Overlay Components
 
 | File | Purpose |
 |------|---------|
-| `overlay/src/index.ts` | Starts the overlay server, registers topic manager and lookup service, exposes REST endpoints |
+| `overlay/src/index.ts` | Starts the overlay server, registers topic manager and lookup service, exposes REST + SSE endpoints |
+| `overlay/src/SSEHub.ts` | In-memory pub/sub hub for real-time game updates via Server-Sent Events |
 | `overlay/src/TicTacToeTopicManager.ts` | Identifies TicTacToe contract outputs in new transactions using `matchesArtifact()` |
 | `overlay/src/TicTacToeLookupService.ts` | Deserializes contract state from on-chain scripts, stores in MongoDB |
 | `overlay/src/TicTacToeStorage.ts` | MongoDB CRUD for game records |
@@ -51,7 +62,7 @@ The overlay service is the bridge between the blockchain and the application. It
 
 ### Why an Overlay?
 
-Smart contract state lives on-chain in UTXOs, but querying the blockchain directly for "all open games" or "games by player" would require scanning every UTXO. The overlay watches the chain, identifies contract outputs, and maintains a queryable index — turning on-chain data into a REST API.
+Smart contract state lives on-chain in UTXOs, but querying the blockchain directly for "all open games" or "games by player" would require scanning every UTXO. The overlay receives transactions via its `/submit` endpoint, identifies contract outputs, and maintains a queryable index — turning on-chain data into a REST API.
 
 ---
 
@@ -73,22 +84,22 @@ runar-tic-tac-toe/
       components/                   # React UI components
       hooks/                        # useWallet, useGame, useGameList, useDerivedKey, useCancelFlow
       lib/
-        api.ts                      # Backend HTTP client
+        api.ts                      # Overlay HTTP client
         game-logic.ts               # Move analysis (method selection)
         wallet.ts                   # BRC-100 wallet integration
         wallet-provider.ts          # SDK provider + artifact config
         types.ts                    # TypeScript interfaces
       pages/                        # LandingPage, GamePage, MyGamesPage
+    public/
+      _redirects                    # Cloudflare Pages SPA routing
   overlay/
     src/
       index.ts                      # Overlay server entry point
+      SSEHub.ts                     # In-memory SSE pub/sub hub
       TicTacToeTopicManager.ts      # Identifies contract outputs on-chain
       TicTacToeLookupService.ts     # Deserializes and indexes game state
       TicTacToeStorage.ts           # MongoDB game storage
       artifact.ts                   # Shared compiled artifact loader
-  main.go                           # Go HTTP server, API routes, SPA serving
-  game.go                           # Overlay REST client, game data types
-  sse.go                            # Server-Sent Events hub
 ```
 
 ---
@@ -145,7 +156,7 @@ Values: `0` = empty, `1` = X, `2` = O.
 
 ```
 Deploy TX (Player X funds via wallet)
-  +-- UTXO: [betAmount] locked by contract (status=0, empty board)
+  +-- UTXO: [betAmount + fee margin] locked by contract (status=0, empty board)
        |
        v
 Join TX (Player O funds additional betAmount)
@@ -204,7 +215,7 @@ while (!vm.isComplete) {
 
 ## Frontend Architecture
 
-React + TypeScript SPA built with Vite. All contract interactions happen in the browser via `runar-sdk`.
+React + TypeScript SPA built with Vite. All contract interactions happen in the browser via `runar-sdk`. Deployable as a static site (e.g., Cloudflare Pages).
 
 ### Contract Interactions
 
@@ -224,29 +235,20 @@ The frontend connects to a BRC-100 desktop wallet. The SDK's `WalletProvider` ha
 
 ---
 
-## Backend Architecture
-
-### Go Backend (main.go, game.go, sse.go)
-
-The Go backend is a thin relay between the browser and the overlay service. It has no knowledge of the contract, the compiler, or Bitcoin Script.
-
-**What it does:**
-- Queries the overlay REST API for game state
-- Pushes real-time updates via SSE so opponents see moves instantly
-- Serves the frontend as embedded static files
-
-**What it does NOT do:** compile contracts, build transactions, validate moves, or talk to BSV nodes.
-
-### API Endpoints
+## API Endpoints (Overlay)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/games` | List open public games (via overlay) |
-| GET | `/api/games/mine?pubkey=` | List player's games (via overlay) |
-| GET | `/api/games/:id` | Get game state (via overlay) |
-| POST | `/api/games/:id/broadcast` | Record action, push SSE update |
-| GET | `/api/games/:id/prepare` | Return contract UTXO info for spending |
-| GET | `/api/games/:id/events` | SSE stream for live updates |
+| POST | `/submit` | Overlay protocol — submit a transaction for indexing |
+| POST | `/lookup` | Overlay protocol — query the lookup service |
+| GET | `/api/games` | List open public games |
+| GET | `/api/games/by-player/:pubkey` | List player's games |
+| GET | `/api/games/:txid` | Get game state |
+| POST | `/api/games/:roomId/broadcast` | Relay game state to SSE subscribers |
+| GET | `/api/games/:roomId/events` | SSE stream for live updates |
+| POST | `/api/identity` | Register player identity key |
+| GET | `/api/tx/:txid/hex` | Raw transaction hex lookup |
+| GET | `/stats` | Game count |
 
 ---
 
@@ -254,7 +256,6 @@ The Go backend is a thin relay between the browser and the overlay service. It h
 
 ### Prerequisites
 
-- Go 1.22+
 - Node.js 18+
 - MongoDB (for overlay storage)
 - BRC-100 desktop wallet at localhost:3321
@@ -284,24 +285,27 @@ cp .env.example .env    # edit with your overlay private key and MongoDB URI
 npm install
 npm run dev             # runs on :8081
 
-# 4. Build and start the Go backend
-cd ..
-cd frontend && npm install && npm run codegen && npm run build && cd ..
-go build -o tic-tac-toe .
-./tic-tac-toe           # runs on :8080
-
-# 5. (Development) Run frontend with hot reload instead of step 4's build
-cd frontend
-npm run dev             # Vite dev server, proxies /api to :8080
+# 4. Start the frontend (development)
+cd ../frontend
+npm install
+npm run codegen         # generate typed contract wrapper
+npm run dev             # Vite dev server on :5173
 ```
+
+### Production Build
+
+```bash
+cd frontend
+npm run codegen && npm run build   # outputs to frontend/dist/
+```
+
+Deploy `frontend/dist/` to Cloudflare Pages (or any static host). Set `VITE_OVERLAY_URL` to the public overlay URL at build time.
 
 ### Environment Variables
 
 | Variable | Default | Where | Description |
 |----------|---------|-------|-------------|
-| `PORT` | `8080` | Go backend | HTTP server port |
-| `OVERLAY_URL` | `http://localhost:8081` | Go backend | Overlay service URL |
-| `VITE_OVERLAY_URL` | `http://localhost:8081` | Frontend | Overlay URL (for identity key registration) |
+| `VITE_OVERLAY_URL` | `http://localhost:8081` | Frontend (build-time) | Overlay URL for API calls and SSE |
 | `OVERLAY_PRIVATE_KEY` | *(required)* | Overlay | 64-char hex private key for overlay node identity |
 | `MONGODB_URI` | *(required)* | Overlay | MongoDB connection string |
 | `OVERLAY_HOSTING_URL` | `http://localhost:8081` | Overlay | Public URL where overlay is reachable |
@@ -344,11 +348,13 @@ npx vitest run TicTacToe.debug.test.ts
 
 ## Design Decisions
 
-**Smart contract as single source of truth:** The contract enforces all game rules on-chain. The overlay indexes state, the Go backend relays it, but neither validates moves. If the contract rejects a move, the transaction fails to broadcast.
+**Smart contract as single source of truth:** The contract enforces all game rules on-chain. The overlay indexes state but doesn't validate moves. If the contract rejects a move, the transaction fails to broadcast.
 
-**Overlay for indexing, not logic:** The overlay watches the blockchain and deserializes contract state into a queryable database. It uses the compiled artifact's metadata (`stateFields`, `constructorSlots`) to extract state generically — no hardcoded byte offsets.
+**No backend server:** The frontend is a static site that talks directly to the overlay service. The overlay handles both blockchain indexing and real-time SSE delivery. No intermediary server needed.
 
-**Frontend-driven contract interactions:** The frontend builds transactions and calls contract methods directly via `runar-sdk`. The backend never touches Bitcoin Script.
+**Overlay for indexing + real-time:** The overlay receives transactions via `/submit`, deserializes contract state into a queryable database, and runs an in-memory SSE hub so players see opponent moves instantly.
+
+**Frontend-driven contract interactions:** The frontend builds transactions and calls contract methods directly via `runar-sdk`. The overlay never touches Bitcoin Script.
 
 **Generated typed contract:** `runar codegen` generates a `TicTacToeContract` class with typed methods, `fromUtxo()` for reconnection, and `deployWithWallet()` for BRC-100 wallet deployment.
 

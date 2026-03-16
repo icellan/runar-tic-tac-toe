@@ -23,7 +23,7 @@ export default function GameList({ games, emptyMessage }: GameListProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {games.map(game => (
-        <GameCard key={game.gameId} game={game} />
+        <GameCard key={game.txid} game={game} />
       ))}
     </div>
   )

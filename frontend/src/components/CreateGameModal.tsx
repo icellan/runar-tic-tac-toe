@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
 import { useDerivedKey } from '../hooks/useDerivedKey'
 import { useNavigate } from 'react-router-dom'
-import { recordAction, registerIdentityKey } from '../lib/api'
+import { broadcastGameState, registerIdentityKey } from '../lib/api'
 import { signer } from '../lib/wallet'
 import { TicTacToeContract } from '../generated/TicTacToeContract'
 import { artifact, provider, estimateFee } from '../lib/wallet-provider'
+import type { Game } from '../lib/types'
 
 interface CreateGameModalProps {
   open: boolean
@@ -52,21 +53,30 @@ export default function CreateGameModal({ open, onClose }: CreateGameModalProps)
         description: `Create Tic-Tac-Toe game (${betAmount} sats bet)`,
       })
 
-      const broadcastResult = await recordAction(txid, txid, 'create', {
-        playerPubKey: derivedKey,
+      // Build the initial game state and broadcast
+      const newGame: Game = {
+        txid,
+        outputIndex,
+        playerX: derivedKey,
+        playerO: '',
+        board: '000000000',
+        turn: 1,
+        status: 0,
         betAmount,
-        contractSatoshis: betAmount + txFeeMargin,
-        isPublic,
+        satoshis: betAmount + txFeeMargin,
         lockingScript: contract.getLockingScript(),
-        vout: outputIndex,
-      })
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      await broadcastGameState(txid, newGame)
 
       if (identityKey) {
         registerIdentityKey(txid, derivedKey, identityKey).catch(console.error)
       }
 
       onClose()
-      navigate(`/game/${broadcastResult.gameId || broadcastResult.txid}`)
+      navigate(`/game/${txid}`)
     } catch (err: any) {
       console.error('[create-game]', err)
       setError('Failed to create game')
