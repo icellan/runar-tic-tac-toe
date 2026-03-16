@@ -77,6 +77,19 @@ async function main() {
   // 404 catch-all during start(), so routes registered after would be unreachable.
   const app = (server as any).app
   if (app) {
+    // CORS for custom routes (overlay-express only adds CORS to its own routes)
+    app.use('/api', (req: any, res: any, next: any) => {
+      res.header('Access-Control-Allow-Origin', '*')
+      res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      res.header('Access-Control-Allow-Headers', 'Content-Type')
+      if (req.method === 'OPTIONS') return res.sendStatus(204)
+      next()
+    })
+    app.use('/stats', (_req: any, res: any, next: any) => {
+      res.header('Access-Control-Allow-Origin', '*')
+      next()
+    })
+
     // Game query REST API
     app.get('/api/games', async (req: any, res: any) => {
       try {
