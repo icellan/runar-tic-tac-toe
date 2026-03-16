@@ -16,7 +16,7 @@
     "express": "^4.21.0",
     "knex": "^3.1.0",
     "mongodb": "^6.8.0",
-    "runar-sdk": "file:../../runar/packages/runar-sdk"
+    "runar-sdk": "0.3.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",

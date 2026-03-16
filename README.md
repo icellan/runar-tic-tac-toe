@@ -259,24 +259,11 @@ The frontend connects to a BRC-100 desktop wallet. The SDK's `WalletProvider` ha
 - Node.js 18+
 - MongoDB (for overlay storage)
 - BRC-100 desktop wallet at localhost:3321
-- Runar monorepo (sibling directory, built)
-
-### Expected Directory Layout
-
-```
-gitcheckout/
-  runar/               # Runar monorepo (cloned and built)
-  runar-tic-tac-toe/   # This project
-```
 
 ### Build & Run
 
 ```bash
-# 1. Build Runar packages
-cd ../runar
-pnpm install && pnpm build
-
-# 2. Start MongoDB
+# 1. Start MongoDB
 mongod --dbpath ./data/db
 
 # 3. Start the overlay service
@@ -299,13 +286,13 @@ cd frontend
 npm run codegen && npm run build   # outputs to frontend/dist/
 ```
 
-Deploy `frontend/dist/` to Cloudflare Pages (or any static host). Set `VITE_OVERLAY_URL` to the public overlay URL at build time.
+Deploy `frontend/dist/` to Cloudflare Pages (or any static host). Set `VITE_OVERLAY_URL` to the public overlay URL at build time (e.g., `https://tic-tac-toe-overlay.runar.run`).
 
 ### Environment Variables
 
 | Variable | Default | Where | Description |
 |----------|---------|-------|-------------|
-| `VITE_OVERLAY_URL` | `http://localhost:8081` | Frontend (build-time) | Overlay URL for API calls and SSE |
+| `VITE_OVERLAY_URL` | `http://localhost:8081` | Frontend (build-time) | Overlay URL for API calls and SSE (production: `https://tic-tac-toe-overlay.runar.run`) |
 | `OVERLAY_PRIVATE_KEY` | *(required)* | Overlay | 64-char hex private key for overlay node identity |
 | `MONGODB_URI` | *(required)* | Overlay | MongoDB connection string |
 | `OVERLAY_HOSTING_URL` | `http://localhost:8081` | Overlay | Public URL where overlay is reachable |

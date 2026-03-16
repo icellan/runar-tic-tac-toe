@@ -13,5 +13,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      // runar-sdk exports Node-only codegen modules that reference node:fs,
+      // node:path, node:url. The frontend never uses them, so stub them out.
+      external: (id) => /runar-sdk\/dist\/codegen/.test(id),
+    },
   },
 })
