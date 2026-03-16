@@ -1,0 +1,28 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.1"]
+    volumes:
+      - mongo-data:/data/db
+    mem_limit: 256m
+
+  overlay:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+    environment:
+      - OVERLAY_PRIVATE_KEY=${OVERLAY_PRIVATE_KEY}
+      - MONGODB_URI=mongodb://mongo:27017
+      - OVERLAY_HOSTING_URL=${OVERLAY_HOSTING_URL:-http://localhost:8081}
+      - OVERLAY_PORT=8081
+    volumes:
+      - overlay-data:/app/data
+    mem_limit: 256m
+
+volumes:
+  mongo-data:
+  overlay-data:

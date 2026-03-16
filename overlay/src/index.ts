@@ -73,15 +73,11 @@ async function main() {
   engine.advertiser = undefined
   engine.broadcaster = undefined
 
-  await server.start()
-  console.log(`TicTacToe Overlay running on port ${PORT}`)
-  console.log(`  Submit txs:  POST ${HOSTING_URL}/submit`)
-  console.log(`  Lookup:      POST ${HOSTING_URL}/lookup`)
-
-  // Custom REST endpoints
+  // Register custom routes BEFORE server.start() — overlay-express adds a
+  // 404 catch-all during start(), so routes registered after would be unreachable.
   const app = (server as any).app
   if (app) {
-    // Game query REST API (used by Go backend instead of overlay lookup protocol)
+    // Game query REST API
     app.get('/api/games', async (req: any, res: any) => {
       try {
         const { games } = await storage.findOpenGames(1, 50)
@@ -214,6 +210,11 @@ async function main() {
       }
     })
   }
+
+  await server.start()
+  console.log(`TicTacToe Overlay running on port ${PORT}`)
+  console.log(`  Submit txs:  POST ${HOSTING_URL}/submit`)
+  console.log(`  Lookup:      POST ${HOSTING_URL}/lookup`)
 }
 
 main().catch(err => {
