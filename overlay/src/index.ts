@@ -76,20 +76,19 @@ async function main() {
 
   // Monkey-patch engine.submit to convert EF → BEEF before processing.
   // The SDK submits in EF format (starts with 0x00) but @bsv/overlay
-  // expects BEEF. This avoids middleware ordering issues with overlay-express.
+  // expects BEEF. overlay-express passes { beef, topics, offChainValues }.
   const origSubmit = engine.submit.bind(engine)
-  engine.submit = async function (beef: any, ...args: any[]) {
-    let data: number[] = beef instanceof Uint8Array ? Array.from(beef) : beef
-    if (Array.isArray(data) && data[0] === 0x00) {
+  engine.submit = async function (taggedBEEF: any, ...args: any[]) {
+    if (taggedBEEF && Array.isArray(taggedBEEF.beef) && taggedBEEF.beef[0] === 0x00) {
       try {
-        const tx = Transaction.fromEF(data)
-        data = tx.toBEEF(true)
+        const tx = Transaction.fromEF(taggedBEEF.beef)
+        taggedBEEF.beef = tx.toBEEF(true)
         console.log(`[submit] Converted EF → BEEF for tx ${tx.id('hex')}`)
       } catch (err: any) {
         console.warn('[submit] EF→BEEF conversion failed:', err.message)
       }
     }
-    return origSubmit(data, ...args)
+    return origSubmit(taggedBEEF, ...args)
   }
 
   // Register custom routes BEFORE server.start() — overlay-express adds a
