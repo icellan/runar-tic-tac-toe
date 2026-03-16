@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { mkdirSync } from 'fs'
+import express from 'express'
 import OverlayExpress from '@bsv/overlay-express'
 import { WhatsOnChain, FetchHttpClient } from '@bsv/sdk'
 import { MongoClient } from 'mongodb'
@@ -77,6 +78,10 @@ async function main() {
   // 404 catch-all during start(), so routes registered after would be unreachable.
   const app = (server as any).app
   if (app) {
+    // Body parser for custom routes (overlay-express adds its own during start(),
+    // but our routes are registered before start() so we need our own)
+    app.use('/api', express.json())
+
     // CORS for custom routes (overlay-express only adds CORS to its own routes)
     app.use('/api', (req: any, res: any, next: any) => {
       res.header('Access-Control-Allow-Origin', '*')
