@@ -74,6 +74,24 @@ async function main() {
   engine.advertiser = undefined
   engine.broadcaster = undefined
 
+  // Monkey-patch engine.submit to convert EF → BEEF before processing.
+  // The SDK submits in EF format (starts with 0x00) but @bsv/overlay
+  // expects BEEF. This avoids middleware ordering issues with overlay-express.
+  const origSubmit = engine.submit.bind(engine)
+  engine.submit = async function (beef: any, ...args: any[]) {
+    let data: number[] = beef instanceof Uint8Array ? Array.from(beef) : beef
+    if (Array.isArray(data) && data[0] === 0x00) {
+      try {
+        const tx = Transaction.fromEF(data)
+        data = tx.toBEEF(true)
+        console.log(`[submit] Converted EF → BEEF for tx ${tx.id('hex')}`)
+      } catch (err: any) {
+        console.warn('[submit] EF→BEEF conversion failed:', err.message)
+      }
+    }
+    return origSubmit(data, ...args)
+  }
+
   // Register custom routes BEFORE server.start() — overlay-express adds a
   // 404 catch-all during start(), so routes registered after would be unreachable.
   const app = (server as any).app
@@ -81,25 +99,6 @@ async function main() {
     // Body parser for custom routes (overlay-express adds its own during start(),
     // but our routes are registered before start() so we need our own)
     app.use('/api', express.json())
-
-    // Convert EF (Extended Format) submissions to BEEF so the overlay engine
-    // can process them. The SDK submits in EF format (starts with 0x00) but
-    // @bsv/overlay expects BEEF format.
-    app.use('/submit', express.raw({ type: '*/*', limit: '1gb' }), (req: any, res: any, next: any) => {
-      if (!req.body || !req.body.length) return next()
-      const buf = Buffer.from(req.body)
-      // EF starts with 0x00, BEEF starts with 0x0100BEEF or 0x0100beef
-      if (buf[0] === 0x00) {
-        try {
-          const tx = Transaction.fromEF(Array.from(buf))
-          req.body = Buffer.from(tx.toBEEF(true))
-          console.log(`[submit] Converted EF → BEEF for tx ${tx.id('hex')}`)
-        } catch (err: any) {
-          console.warn('[submit] EF→BEEF conversion failed:', err.message)
-        }
-      }
-      next()
-    })
 
     // CORS for custom routes (overlay-express only adds CORS to its own routes)
     app.use('/api', (req: any, res: any, next: any) => {

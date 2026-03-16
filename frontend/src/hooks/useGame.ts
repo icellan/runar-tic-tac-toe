@@ -11,6 +11,7 @@ export function useGame(gameId: string | undefined) {
   const [loading, setLoading] = useState(!initialGame)
   const [error, setError] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const retryRef = useRef(0)
 
   useEffect(() => {
     if (!gameId) return
@@ -25,8 +26,15 @@ export function useGame(gameId: string | undefined) {
           setLoading(false)
         }
       } catch {
-        // Game may not be indexed yet (e.g., just created). SSE or
-        // navigation state will provide the data, so don't treat as fatal.
+        // Game may not be indexed yet (e.g., just created). Retry a few
+        // times before giving up — SSE may also deliver the state.
+        retryRef.current++
+        if (retryRef.current < 5 && !cancelled) {
+          setTimeout(load, 2000)
+        } else if (!cancelled && !game) {
+          setError('Game not found')
+          setLoading(false)
+        }
       }
     }
 
@@ -58,6 +66,7 @@ export function useGame(gameId: string | undefined) {
 
     return () => {
       cancelled = true
+      retryRef.current = 0
       es.close()
       eventSourceRef.current = null
     }
