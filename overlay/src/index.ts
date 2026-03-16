@@ -162,6 +162,15 @@ async function main() {
             }
           }
         }
+        // Fallback: fetch from WhatsOnChain
+        try {
+          const wocResp = await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/${req.params.txid}/hex`)
+          if (wocResp.ok) {
+            const hex = await wocResp.text()
+            res.type('text/plain').send(hex)
+            return
+          }
+        } catch { /* fall through */ }
         res.status(404).send('not found')
       } catch (err: any) {
         res.status(500).send(err.message)
