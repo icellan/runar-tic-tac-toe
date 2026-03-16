@@ -217,7 +217,7 @@ async function main() {
       req.on('close', () => sseHub.unsubscribe(roomId, res))
     })
 
-    // Broadcast endpoint — relay game state to SSE subscribers
+    // Broadcast endpoint — relay game state to SSE subscribers and persist to DB
     app.post('/api/games/:roomId/broadcast', async (req: any, res: any) => {
       const { roomId } = req.params
       const game = req.body
@@ -225,6 +225,25 @@ async function main() {
         return res.status(400).json({ error: 'missing game state with txid' })
       }
       sseHub.broadcast(roomId, game)
+      // Persist to MongoDB so the game is findable before on-chain indexing
+      try {
+        await storage.upsertGame({
+          txid: game.txid,
+          outputIndex: game.outputIndex ?? 0,
+          playerX: game.playerX || '',
+          playerO: game.playerO || '',
+          board: game.board || '000000000',
+          turn: game.turn ?? 0,
+          status: game.status ?? 0,
+          betAmount: game.betAmount ?? 0,
+          satoshis: game.satoshis ?? 0,
+          lockingScript: game.lockingScript || '',
+          createdAt: new Date(game.createdAt || Date.now()),
+          updatedAt: new Date(),
+        })
+      } catch (err: any) {
+        console.warn('[broadcast] DB persist failed:', err.message)
+      }
       res.json({ txid: game.txid, roomId, game })
     })
 
