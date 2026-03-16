@@ -76,7 +76,7 @@ export default function CreateGameModal({ open, onClose }: CreateGameModalProps)
       }
 
       onClose()
-      navigate(`/game/${txid}`)
+      navigate(`/game/${txid}`, { state: { game: newGame } })
     } catch (err: any) {
       console.error('[create-game]', err)
       setError('Failed to create game')
