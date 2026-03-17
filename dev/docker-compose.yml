@@ -1,0 +1,17 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - ttt-mongo-data:/data/db
+    mem_limit: 256m
+    networks:
+      - ttt-dev
+
+networks:
+  ttt-dev:
+    driver: bridge
+
+volumes:
+  ttt-mongo-data:

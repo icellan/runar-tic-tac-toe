@@ -15,9 +15,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0",
-    "runar-cli": "0.3.0",
-    "runar-lang": "0.3.0",
-    "runar-sdk": "0.3.0"
+    "runar-cli": "^0.3.2",
+    "runar-lang": "^0.3.2",
+    "runar-sdk": "^0.3.2"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

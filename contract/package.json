@@ -15,12 +15,12 @@
   "devDependencies": {
     "@bsv/sdk": "^2.0.5",
     "@types/node": "^25.3.5",
-    "runar-cli": "0.3.0",
-    "runar-compiler": "0.3.0",
-    "runar-ir-schema": "0.3.0",
-    "runar-lang": "0.3.0",
-    "runar-sdk": "0.3.0",
-    "runar-testing": "0.3.0",
+    "runar-cli": "0.3.2",
+    "runar-compiler": "0.3.2",
+    "runar-ir-schema": "0.3.2",
+    "runar-lang": "0.3.2",
+    "runar-sdk": "0.3.2",
+    "runar-testing": "0.3.2",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

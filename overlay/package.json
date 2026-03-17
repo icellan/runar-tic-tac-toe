@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:regtest": "REGTEST=true tsx watch src/index.ts",
     "start": "tsx src/index.ts"
   },
   "dependencies": {
@@ -16,7 +17,7 @@
     "express": "^4.21.0",
     "knex": "^3.1.0",
     "mongodb": "^6.8.0",
-    "runar-sdk": "0.3.0"
+    "runar-sdk": "0.3.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",

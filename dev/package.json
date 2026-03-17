@@ -1,10 +1,11 @@
 {
-  "name": "tictactoe-integration",
+  "name": "tictactoe-dev",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "runar-compiler": "0.3.2",
