@@ -11,21 +11,21 @@ export default function LandingPage() {
     <div>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 24,
+        marginBottom: 28,
       }}>
         <div>
-          <h1 style={{ fontSize: 24, marginBottom: 4 }}>Open Challenges</h1>
+          <h1 style={{ fontSize: 26, marginBottom: 4, letterSpacing: '0.01em' }}>Open Challenges</h1>
           <p style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>
             Join a game or create your own
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>
+        <button className="btn-primary" style={{ fontSize: 15, padding: '12px 24px' }} onClick={() => setShowCreate(true)}>
           New Game
         </button>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-dim)' }}>
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-text-dim)', fontSize: 14 }}>
           Loading...
         </div>
       ) : (

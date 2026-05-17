@@ -13,42 +13,49 @@ export default function GameCell({ index, value, onClick, disabled, isWinning }:
   const y = row * 100
   const cx = x + 50
   const cy = y + 50
+  const clickable = !disabled && value === 0
 
   return (
     <g
-      onClick={() => !disabled && value === 0 && onClick(index)}
-      style={{ cursor: !disabled && value === 0 ? 'pointer' : 'default' }}
+      onClick={() => clickable && onClick(index)}
+      style={{ cursor: clickable ? 'pointer' : 'default' }}
     >
-      {/* Cell background (hover effect) */}
+      {/* Cell background */}
       <rect
         x={x + 2} y={y + 2}
         width={96} height={96}
         rx={8}
-        fill={isWinning ? 'rgba(255, 217, 61, 0.1)' : 'transparent'}
-        className={!disabled && value === 0 ? 'cell-hover' : ''}
+        fill={isWinning ? 'rgba(255, 224, 64, 0.08)' : 'transparent'}
+        className={clickable ? 'cell-hover' : ''}
       />
 
-      {/* X mark */}
+      {/* X mark — draw-in animation with glow */}
       {value === 1 && (
-        <g style={{ animation: 'scaleIn 0.3s ease-out' }}>
+        <g
+          style={{ filter: isWinning ? 'drop-shadow(0 0 8px var(--color-x))' : 'none' }}
+        >
           <line
-            x1={cx - 25} y1={cy - 25}
-            x2={cx + 25} y2={cy + 25}
+            x1={cx - 24} y1={cy - 24}
+            x2={cx + 24} y2={cy + 24}
             stroke="var(--color-x)"
             strokeWidth={6}
             strokeLinecap="round"
+            strokeDasharray="80"
+            style={{ animation: 'drawX 0.35s ease-out forwards' }}
           />
           <line
-            x1={cx + 25} y1={cy - 25}
-            x2={cx - 25} y2={cy + 25}
+            x1={cx + 24} y1={cy - 24}
+            x2={cx - 24} y2={cy + 24}
             stroke="var(--color-x)"
             strokeWidth={6}
             strokeLinecap="round"
+            strokeDasharray="80"
+            style={{ animation: 'drawX 0.35s ease-out 0.08s forwards', opacity: 0 }}
           />
         </g>
       )}
 
-      {/* O mark */}
+      {/* O mark — draw-in animation with glow */}
       {value === 2 && (
         <circle
           cx={cx} cy={cy} r={28}
@@ -56,7 +63,11 @@ export default function GameCell({ index, value, onClick, disabled, isWinning }:
           stroke="var(--color-o)"
           strokeWidth={6}
           strokeLinecap="round"
-          style={{ animation: 'scaleIn 0.3s ease-out' }}
+          strokeDasharray="176"
+          style={{
+            animation: 'drawO 0.4s ease-out forwards',
+            filter: isWinning ? 'drop-shadow(0 0 8px var(--color-o))' : 'none',
+          }}
         />
       )}
     </g>

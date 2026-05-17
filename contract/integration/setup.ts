@@ -1,8 +1,25 @@
 /**
- * Vitest globalSetup — checks node availability and mines initial blocks.
+ * Combined vitest setup for integration tests.
+ *
+ * Referenced twice by vitest.config.ts:
+ *   - `setupFiles`: evaluated in each test worker. Side-effect polyfills
+ *     globalThis.crypto for @bsv/sdk's Random module before tests run.
+ *   - `globalSetup`: invoked once in a separate Node process before all
+ *     tests. The default-exported `setup()` checks node availability and
+ *     mines initial blocks.
  */
 
-import { isNodeAvailable, getBlockCount, mine, rpcCall } from './helpers/node.js';
+import { webcrypto } from 'node:crypto';
+import {
+  isNodeAvailable,
+  getBlockCount,
+  mineBlocks,
+  rpcCall,
+} from 'runar-overlay-express/regtest';
+
+if (!globalThis.crypto) {
+  (globalThis as any).crypto = webcrypto;
+}
 
 export default async function setup() {
   const available = await isNodeAvailable();
@@ -17,7 +34,7 @@ export default async function setup() {
   const needed = target - height;
   if (needed > 0) {
     console.error(`Mining ${needed} blocks (current: ${height}, target: ${target})...`);
-    await mine(needed);
+    await mineBlocks(needed);
   }
 
   const balance = (await rpcCall('getbalance')) as number;

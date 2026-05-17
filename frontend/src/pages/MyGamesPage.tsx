@@ -1,12 +1,12 @@
-import { useWallet } from '../hooks/useWallet'
-import { useDerivedKey } from '../hooks/useDerivedKey'
+import { useWallet, useDerivedKey } from 'runar-react'
 import { useGameList } from '../hooks/useGameList'
+import { signer } from '../lib/wallet'
 import GameList from '../components/GameList'
 
 export default function MyGamesPage() {
-  const { connected, pubkey } = useWallet()
-  const { derivedKey } = useDerivedKey()
-  const { games, loading } = useGameList(derivedKey || pubkey)
+  const { connected, identityKey } = useWallet()
+  const { derivedKey } = useDerivedKey(signer, connected)
+  const { games, loading } = useGameList(derivedKey || identityKey)
 
   if (!connected) {
     return (

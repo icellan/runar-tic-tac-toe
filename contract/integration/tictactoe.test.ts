@@ -10,14 +10,19 @@
  *   - cancel (terminal, dual-sig): Both players agree to cancel
  */
 
+import { resolve } from 'path';
 import { describe, it, expect } from 'vitest';
-import { compileContract } from './helpers/compile.js';
 import { RunarContract, buildP2PKHScript } from 'runar-sdk';
 import type { RunarArtifact } from 'runar-ir-schema';
-import type { Signer } from 'runar-sdk';
-import { createFundedWallet } from './helpers/wallet.js';
-import { createProvider } from './helpers/node.js';
-import type { RPCProvider } from 'runar-sdk';
+import type { Signer, RPCProvider } from 'runar-sdk';
+import {
+  compileContract as compileContractFn,
+  createFundedRegtestWallet as createFundedWallet,
+  createRegtestProvider as createProvider,
+} from 'runar-overlay-express/regtest';
+
+const CONTRACT_SOURCE = resolve(import.meta.dirname, '..', 'TicTacToe.runar.ts');
+const compileContract = (): RunarArtifact => compileContractFn(CONTRACT_SOURCE);
 
 const BET_AMOUNT = 5000;
 

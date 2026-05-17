@@ -1,5 +1,5 @@
 import { StatefulSmartContract, assert, checkSig, num2bin, cat, hash160, hash256, extractOutputHash } from 'runar-lang';
-import type { PubKey, Sig, ByteString } from 'runar-lang';
+import type { FixedArray, PubKey, Sig, ByteString } from 'runar-lang';
 
 /**
  * On-chain Tic-Tac-Toe contract.
@@ -9,8 +9,9 @@ import type { PubKey, Sig, ByteString } from 'runar-lang';
  * entirely in Bitcoin Script.
  *
  * **Board encoding:**
- * Since Runar has no arrays, the 3x3 board uses 9 individual bigint fields
- * (c0-c8). Values: 0=empty, 1=X, 2=O.
+ * The 3x3 board is a `FixedArray<bigint, 9>` which the Rúnar compiler's
+ * `expand-fixed-arrays` pass desugars to 9 scalar siblings (board__0..board__8).
+ * Values: 0=empty, 1=X, 2=O.
  *
  * **Lifecycle:**
  * 1. Player X deploys the contract with their bet amount.
@@ -37,15 +38,7 @@ export class TicTacToe extends StatefulSmartContract {
   readonly p2pkhSuffix: ByteString = "88ac" as ByteString;
 
   playerO: PubKey = "000000000000000000000000000000000000000000000000000000000000000000" as PubKey;
-  c0: bigint = 0n;
-  c1: bigint = 0n;
-  c2: bigint = 0n;
-  c3: bigint = 0n;
-  c4: bigint = 0n;
-  c5: bigint = 0n;
-  c6: bigint = 0n;
-  c7: bigint = 0n;
-  c8: bigint = 0n;
+  board: FixedArray<bigint, 9> = [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
   turn: bigint = 0n;
   status: bigint = 0n;
 
@@ -176,45 +169,36 @@ export class TicTacToe extends StatefulSmartContract {
   }
 
   private assertCellEmpty(position: bigint) {
-    if (position == 0n) { assert(this.c0 == 0n); }
-    else if (position == 1n) { assert(this.c1 == 0n); }
-    else if (position == 2n) { assert(this.c2 == 0n); }
-    else if (position == 3n) { assert(this.c3 == 0n); }
-    else if (position == 4n) { assert(this.c4 == 0n); }
-    else if (position == 5n) { assert(this.c5 == 0n); }
-    else if (position == 6n) { assert(this.c6 == 0n); }
-    else if (position == 7n) { assert(this.c7 == 0n); }
-    else if (position == 8n) { assert(this.c8 == 0n); }
+    if (position == 0n) { assert(this.board[0] == 0n); }
+    else if (position == 1n) { assert(this.board[1] == 0n); }
+    else if (position == 2n) { assert(this.board[2] == 0n); }
+    else if (position == 3n) { assert(this.board[3] == 0n); }
+    else if (position == 4n) { assert(this.board[4] == 0n); }
+    else if (position == 5n) { assert(this.board[5] == 0n); }
+    else if (position == 6n) { assert(this.board[6] == 0n); }
+    else if (position == 7n) { assert(this.board[7] == 0n); }
+    else if (position == 8n) { assert(this.board[8] == 0n); }
     else { assert(false); }
   }
 
   private placeMove(position: bigint) {
     this.assertCellEmpty(position);
-    if (position == 0n) { this.c0 = this.turn; }
-    else if (position == 1n) { this.c1 = this.turn; }
-    else if (position == 2n) { this.c2 = this.turn; }
-    else if (position == 3n) { this.c3 = this.turn; }
-    else if (position == 4n) { this.c4 = this.turn; }
-    else if (position == 5n) { this.c5 = this.turn; }
-    else if (position == 6n) { this.c6 = this.turn; }
-    else if (position == 7n) { this.c7 = this.turn; }
-    else if (position == 8n) { this.c8 = this.turn; }
-    else { assert(false); }
+    this.board[position as unknown as number] = this.turn;
   }
 
   private getCellOrOverride(cellIndex: bigint, overridePos: bigint, overrideVal: bigint): bigint {
     if (cellIndex == overridePos) {
       return overrideVal;
     }
-    if (cellIndex == 0n) { return this.c0; }
-    else if (cellIndex == 1n) { return this.c1; }
-    else if (cellIndex == 2n) { return this.c2; }
-    else if (cellIndex == 3n) { return this.c3; }
-    else if (cellIndex == 4n) { return this.c4; }
-    else if (cellIndex == 5n) { return this.c5; }
-    else if (cellIndex == 6n) { return this.c6; }
-    else if (cellIndex == 7n) { return this.c7; }
-    else { return this.c8; }
+    if (cellIndex == 0n) { return this.board[0]; }
+    else if (cellIndex == 1n) { return this.board[1]; }
+    else if (cellIndex == 2n) { return this.board[2]; }
+    else if (cellIndex == 3n) { return this.board[3]; }
+    else if (cellIndex == 4n) { return this.board[4]; }
+    else if (cellIndex == 5n) { return this.board[5]; }
+    else if (cellIndex == 6n) { return this.board[6]; }
+    else if (cellIndex == 7n) { return this.board[7]; }
+    else { return this.board[8]; }
   }
 
   private checkWinAfterMove(position: bigint, player: bigint): boolean {
@@ -241,15 +225,15 @@ export class TicTacToe extends StatefulSmartContract {
 
   private countOccupied(): bigint {
     let count = 0n;
-    if (this.c0 != 0n) { count = count + 1n; }
-    if (this.c1 != 0n) { count = count + 1n; }
-    if (this.c2 != 0n) { count = count + 1n; }
-    if (this.c3 != 0n) { count = count + 1n; }
-    if (this.c4 != 0n) { count = count + 1n; }
-    if (this.c5 != 0n) { count = count + 1n; }
-    if (this.c6 != 0n) { count = count + 1n; }
-    if (this.c7 != 0n) { count = count + 1n; }
-    if (this.c8 != 0n) { count = count + 1n; }
+    if (this.board[0] != 0n) { count = count + 1n; }
+    if (this.board[1] != 0n) { count = count + 1n; }
+    if (this.board[2] != 0n) { count = count + 1n; }
+    if (this.board[3] != 0n) { count = count + 1n; }
+    if (this.board[4] != 0n) { count = count + 1n; }
+    if (this.board[5] != 0n) { count = count + 1n; }
+    if (this.board[6] != 0n) { count = count + 1n; }
+    if (this.board[7] != 0n) { count = count + 1n; }
+    if (this.board[8] != 0n) { count = count + 1n; }
     return count;
   }
 }

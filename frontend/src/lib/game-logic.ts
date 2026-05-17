@@ -31,15 +31,7 @@ function createSimulation(board: string, turn: number, playerX: string, playerO:
   sim.turn = BigInt(turn)
   sim.status = 1n
   const cells = parseBoard(board)
-  sim.c0 = BigInt(cells[0])
-  sim.c1 = BigInt(cells[1])
-  sim.c2 = BigInt(cells[2])
-  sim.c3 = BigInt(cells[3])
-  sim.c4 = BigInt(cells[4])
-  sim.c5 = BigInt(cells[5])
-  sim.c6 = BigInt(cells[6])
-  sim.c7 = BigInt(cells[7])
-  sim.c8 = BigInt(cells[8])
+  sim.board = cells.map(c => BigInt(c)) as any
   return sim
 }
 

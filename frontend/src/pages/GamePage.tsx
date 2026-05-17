@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import { useWallet, useDerivedKey } from 'runar-react'
 import { useGame } from '../hooks/useGame'
-import { useWallet } from '../hooks/useWallet'
-import { useDerivedKey } from '../hooks/useDerivedKey'
 import { useCancelFlow } from '../hooks/useCancelFlow'
 import GameBoard from '../components/GameBoard'
 import PlayerBadge from '../components/PlayerBadge'
@@ -10,29 +9,16 @@ import BetDisplay from '../components/BetDisplay'
 import MoveLog from '../components/MoveLog'
 import { broadcastGameState, registerIdentityKey } from '../lib/api'
 import { signer } from '../lib/wallet'
-import { provider, artifact, estimateFee, pubkeyToPKH } from '../lib/wallet-provider'
-import { TicTacToeContract } from '../generated/TicTacToeContract'
+import { provider, estimateFee, pubkeyToPKH, loadContract } from '../lib/wallet-provider'
 import { analyzeMove } from '../lib/game-logic'
 import { STATUS_LABELS } from '../lib/types'
 import type { Game } from '../lib/types'
-
-/** Load the on-chain contract from local game state (no network call needed). */
-function loadGameContract(game: Game) {
-  const contract = TicTacToeContract.fromUtxo(artifact, {
-    txid: game.txid,
-    outputIndex: game.outputIndex,
-    satoshis: game.satoshis,
-    script: game.lockingScript,
-  })
-  contract.connect(provider, signer)
-  return contract
-}
 
 export default function GamePage() {
   const { id } = useParams<{ id: string }>()
   const { game, loading, error, setGame } = useGame(id)
   const { connected } = useWallet()
-  const { derivedKey, identityKey } = useDerivedKey()
+  const { derivedKey, identityKey } = useDerivedKey(signer, connected)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
   const [winLine, setWinLine] = useState<number[] | null>(null)
@@ -43,7 +29,7 @@ export default function GamePage() {
     (game.turn === 1 && isPlayerX) || (game.turn === 2 && isPlayerO)
   )
 
-  const cancel = useCancelFlow(game, derivedKey, identityKey, isPlayerX, isPlayerO, setGame, id)
+  const cancel = useCancelFlow(game, derivedKey, identityKey, isPlayerX, setGame, id)
 
   // Register identity key with overlay when we know both game and identity
   useEffect(() => {
@@ -70,7 +56,7 @@ export default function GamePage() {
       const fee = estimateFee()
       const changePKH = pubkeyToPKH(derivedKey)
 
-      const contract = loadGameContract(game)
+      const contract = loadContract(game)
       let txid: string
       let newSatoshis = game.satoshis
 
@@ -135,7 +121,7 @@ export default function GamePage() {
 
     try {
       await provider.ensureFunding(game.betAmount + estimateFee())
-      const contract = loadGameContract(game)
+      const contract = loadContract(game)
       const result = await contract.join(null, { satoshis: game.betAmount * 2 })
 
       const newGame: Game = {
@@ -179,13 +165,19 @@ export default function GamePage() {
       {gameOver && (
         <div style={{
           textAlign: 'center',
-          padding: '16px 24px',
+          padding: '18px 24px',
           marginBottom: 24,
           borderRadius: 'var(--radius)',
-          background: game.status === 4 ? 'rgba(136, 136, 170, 0.1)' : 'rgba(255, 217, 61, 0.1)',
+          background: game.status === 4
+            ? 'rgba(110, 110, 138, 0.1)'
+            : 'linear-gradient(135deg, rgba(255, 224, 64, 0.1) 0%, rgba(255, 82, 82, 0.05) 100%)',
           border: `1px solid ${game.status === 4 ? 'var(--color-text-dim)' : 'var(--color-accent)'}`,
-          fontSize: 18,
+          fontFamily: 'var(--font-display)',
+          fontSize: 20,
           fontWeight: 700,
+          letterSpacing: '0.04em',
+          textShadow: game.status !== 4 ? '0 0 12px rgba(255, 224, 64, 0.3)' : 'none',
+          animation: 'fadeIn 0.4s ease-out',
         }}>
           {STATUS_LABELS[game.status]}
         </div>
@@ -235,8 +227,17 @@ export default function GamePage() {
       )}
 
       {game.status === 1 && !gameOver && (
-        <div style={{ textAlign: 'center', padding: 12, fontSize: 14, color: isMyTurn ? 'var(--color-accent)' : 'var(--color-text-dim)', fontWeight: isMyTurn ? 600 : 400 }}>
-          {isMyTurn ? 'Your turn!' : "Opponent's turn..."}
+        <div style={{
+          textAlign: 'center',
+          padding: 14,
+          fontFamily: 'var(--font-display)',
+          fontSize: 15,
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          color: isMyTurn ? 'var(--color-accent)' : 'var(--color-text-dim)',
+          textShadow: isMyTurn ? '0 0 10px rgba(255, 224, 64, 0.4)' : 'none',
+        }}>
+          {isMyTurn ? 'YOUR TURN' : "OPPONENT'S TURN..."}
         </div>
       )}
 

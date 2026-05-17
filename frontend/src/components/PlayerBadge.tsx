@@ -7,40 +7,48 @@ interface PlayerBadgeProps {
 
 export default function PlayerBadge({ label, pubkey, isCurrentTurn, mark }: PlayerBadgeProps) {
   const color = mark === 'X' ? 'var(--color-x)' : 'var(--color-o)'
+  const glow = mark === 'X' ? 'var(--glow-x)' : 'var(--glow-o)'
 
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
-      padding: '8px 12px',
+      gap: 10,
+      padding: '10px 14px',
       overflow: 'hidden',
       borderRadius: 'var(--radius-sm)',
-      background: isCurrentTurn ? 'rgba(255, 217, 61, 0.08)' : 'transparent',
-      border: isCurrentTurn ? '1px solid var(--color-accent)' : '1px solid transparent',
-      transition: 'all 0.3s',
+      background: isCurrentTurn ? 'rgba(255, 224, 64, 0.06)' : 'var(--bg-secondary)',
+      border: isCurrentTurn ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
+      transition: 'all 0.3s ease',
+      animation: isCurrentTurn ? 'pulseGlow 2s ease-in-out infinite' : 'none',
     }}>
       <span style={{
-        width: 32, height: 32,
+        width: 36, height: 36,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 800, fontSize: 18, color,
-        background: `${color}22`,
-        borderRadius: 6,
+        fontFamily: 'var(--font-display)',
+        fontWeight: 700, fontSize: 18, color,
+        background: `${color}18`,
+        borderRadius: 8,
+        boxShadow: isCurrentTurn ? glow : 'none',
+        transition: 'box-shadow 0.3s',
       }}>
         {mark}
       </span>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>{label}</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {pubkey ? `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}` : 'Waiting...'}
         </div>
       </div>
       {isCurrentTurn && (
         <span style={{
           marginLeft: 'auto',
+          fontFamily: 'var(--font-display)',
           fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
           color: 'var(--color-accent)',
-          fontWeight: 600,
+          textShadow: '0 0 8px rgba(255, 224, 64, 0.5)',
         }}>
           TURN
         </span>

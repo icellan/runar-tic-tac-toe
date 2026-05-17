@@ -11,5 +11,5 @@ import { fileURLToPath } from 'url'
 import type { RunarArtifact } from 'runar-sdk'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const artifactPath = resolve(__dirname, '..', '..', 'frontend', 'src', 'generated', 'TicTacToe.runar.json')
+const artifactPath = resolve(__dirname, '..', '..', 'contract', 'artifacts', 'TicTacToe.runar.json')
 export const artifact = JSON.parse(readFileSync(artifactPath, 'utf-8')) as RunarArtifact

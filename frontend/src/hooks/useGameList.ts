@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { Game } from '../lib/types'
+import { useCallback } from 'react'
+import { usePolledList } from 'runar-react'
 import { listGames, listMyGames } from '../lib/api'
+import type { Game } from '../lib/types'
 
 /**
  * Fetch and poll game lists.
@@ -8,30 +9,11 @@ import { listGames, listMyGames } from '../lib/api'
  * With a pubkey: returns games for that player.
  */
 export function useGameList(pubkey?: string) {
-  const [games, setGames] = useState<Game[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const refresh = useCallback(async () => {
-    if (pubkey !== undefined && !pubkey) {
-      setGames([])
-      setLoading(false)
-      return
-    }
-    try {
-      const g = pubkey ? await listMyGames(pubkey) : await listGames()
-      setGames(g)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
+  const fetchList = useCallback(async (): Promise<Game[]> => {
+    if (pubkey === undefined) return listGames()
+    if (!pubkey) return []
+    return listMyGames(pubkey)
   }, [pubkey])
-
-  useEffect(() => {
-    refresh()
-    const interval = setInterval(refresh, 5000)
-    return () => clearInterval(interval)
-  }, [refresh])
-
-  return { games, loading, refresh }
+  const { data, loading, refresh } = usePolledList<Game>({ fetchList, intervalMs: 5000 })
+  return { games: data, loading, refresh }
 }

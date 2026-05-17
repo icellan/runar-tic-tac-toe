@@ -9,7 +9,7 @@ interface GameCardProps {
 function MiniBoard({ board }: { board: string }) {
   const cells = board.split('').map(Number)
   return (
-    <svg viewBox="0 0 60 60" width={60} height={60}>
+    <svg viewBox="0 0 60 60" width={60} height={60} style={{ flexShrink: 0 }}>
       {/* Grid */}
       <line x1={20} y1={2} x2={20} y2={58} stroke="var(--color-border)" strokeWidth={1} />
       <line x1={40} y1={2} x2={40} y2={58} stroke="var(--color-border)" strokeWidth={1} />
@@ -59,19 +59,30 @@ export default function GameCard({ game }: GameCardProps) {
         display: 'flex',
         alignItems: 'center',
         gap: 16,
-        transition: 'background 0.2s',
         cursor: 'pointer',
       }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--bg-card-hover)'
+          e.currentTarget.style.borderColor = 'var(--color-text-dim)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'var(--bg-card)'
+          e.currentTarget.style.borderColor = 'var(--color-border)'
+        }}
       >
         <MiniBoard board={game.board} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span className={statusBadgeClass(game.status)}>
               {STATUS_LABELS[game.status]}
             </span>
-            <span style={{ color: 'var(--color-accent)', fontSize: 13, fontWeight: 600 }}>
+            <span style={{
+              color: 'var(--color-accent)',
+              fontSize: 14,
+              fontWeight: 700,
+              fontFamily: 'var(--font-display)',
+              textShadow: '0 0 8px rgba(255, 224, 64, 0.2)',
+            }}>
               {game.betAmount.toLocaleString()} sats
             </span>
           </div>

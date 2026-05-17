@@ -21,12 +21,6 @@ export interface BroadcastResponse {
   game: Game
 }
 
-export interface WalletState {
-  connected: boolean
-  pubkey: string
-  balance: number
-}
-
 export const STATUS_LABELS: Record<number, string> = {
   0: 'Waiting for opponent',
   1: 'In progress',

@@ -8,8 +8,6 @@ export default function MoveLog({ game }: MoveLogProps) {
   const board = game.board.split('').map(Number)
   const moves: { position: number; player: string; mark: string }[] = []
 
-  // Reconstruct move order from board (X always goes first)
-  // We can't know exact order from state alone, but we can show the current board state
   for (let i = 0; i < 9; i++) {
     if (board[i] === 1) {
       moves.push({ position: i, player: 'X', mark: 'X' })
@@ -34,14 +32,16 @@ export default function MoveLog({ game }: MoveLogProps) {
 
   return (
     <div style={{ fontSize: 13 }}>
-      <div style={{ color: 'var(--color-text-dim)', marginBottom: 8, fontSize: 12 }}>Board State</div>
+      <div style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-dim)', marginBottom: 8, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        Board State
+      </div>
       {moves.map((m, i) => (
         <div key={i} style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '4px 0',
           color: m.mark === 'X' ? 'var(--color-x)' : 'var(--color-o)',
         }}>
-          <span style={{ fontWeight: 600, width: 16 }}>{m.mark}</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, width: 16 }}>{m.mark}</span>
           <span style={{ color: 'var(--color-text-dim)' }}>{posLabel(m.position)}</span>
         </div>
       ))}

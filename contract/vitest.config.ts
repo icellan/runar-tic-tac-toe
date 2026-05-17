@@ -13,4 +13,7 @@ export default defineConfig({
       'runar-sdk': resolve(runarRoot, 'packages/runar-sdk/src/index.ts'),
     },
   },
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', 'integration/**'],
+  },
 });

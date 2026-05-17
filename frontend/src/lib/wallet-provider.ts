@@ -1,14 +1,9 @@
-/**
- * SDK configuration — wallet provider, artifact, and fee estimation.
- *
- * All transaction caching, EF format broadcasting, ARC integration, and
- * overlay submission is handled by the SDK's WalletProvider.
- */
-import { WalletProvider, estimateCallFee } from 'runar-sdk'
+import { WalletProvider, pubkeyToPKH, estimateFeeForArtifact } from 'runar-sdk'
 import type { RunarArtifact } from 'runar-sdk'
-import { Hash } from '@bsv/sdk'
 import { wallet, signer } from './wallet'
-import artifactJSON from '../generated/TicTacToe.runar.json'
+import { TicTacToeContract } from '../generated/TicTacToeContract'
+import type { Game } from './types'
+import artifactJSON from '../../../contract/artifacts/TicTacToe.runar.json'
 
 export const OVERLAY_URL = import.meta.env.VITE_OVERLAY_URL || 'http://localhost:8081'
 
@@ -26,10 +21,19 @@ export const provider = new WalletProvider({
 })
 
 export function estimateFee(): number {
-  return estimateCallFee(artifact.script.length / 2, artifact.script.length / 4, 1, 0.1)
+  return estimateFeeForArtifact(artifact, { feeRate: 0.1 })
 }
 
-/** Compute the hash160 PKH for a compressed public key hex string. */
-export function pubkeyToPKH(pubkey: string): string {
-  return Hash.hash160(pubkey, 'hex').map((b: number) => b.toString(16).padStart(2, '0')).join('')
+/** Load the on-chain contract from local game state (no network call). */
+export function loadContract(game: Game) {
+  const contract = TicTacToeContract.fromUtxo(artifact, {
+    txid: game.txid,
+    outputIndex: game.outputIndex,
+    satoshis: game.satoshis,
+    script: game.lockingScript,
+  })
+  contract.connect(provider, signer)
+  return contract
 }
+
+export { pubkeyToPKH }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useWallet } from '../hooks/useWallet'
-import { useDerivedKey } from '../hooks/useDerivedKey'
+import { useWallet, useDerivedKey } from 'runar-react'
 import { useNavigate } from 'react-router-dom'
 import { broadcastGameState, registerIdentityKey } from '../lib/api'
 import { signer } from '../lib/wallet'
@@ -15,7 +14,7 @@ interface CreateGameModalProps {
 
 export default function CreateGameModal({ open, onClose }: CreateGameModalProps) {
   const { connected } = useWallet()
-  const { derivedKey, identityKey } = useDerivedKey()
+  const { derivedKey, identityKey } = useDerivedKey(signer, connected)
   const navigate = useNavigate()
   const [betAmount, setBetAmount] = useState(1000)
   const [isPublic, setIsPublic] = useState(true)
@@ -89,13 +88,15 @@ export default function CreateGameModal({ open, onClose }: CreateGameModalProps)
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(5, 5, 12, 0.8)',
+      backdropFilter: 'blur(8px)',
     }} onClick={handleClose}>
       <div className="card" style={{
         width: 400, maxWidth: '90vw',
-        animation: 'fadeIn 0.2s ease-out',
+        animation: 'fadeIn 0.25s ease-out',
+        border: '1px solid rgba(255, 224, 64, 0.15)',
       }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ marginBottom: 20, fontSize: 18 }}>New Game</h2>
+        <h2 style={{ marginBottom: 20, fontSize: 20, letterSpacing: '0.02em' }}>New Game</h2>
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: 'var(--color-text-dim)' }}>
